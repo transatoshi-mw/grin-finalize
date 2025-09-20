@@ -19,7 +19,7 @@ struct Response {
 #[tokio::main]
 async fn main() {
     // Initialize logging
-    let log_file = File::create("app.log").unwrap();
+    let log_file = File::create("finalize.log").unwrap();
     CombinedLogger::init(vec![
         TermLogger::new(LevelFilter::Info, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
         WriteLogger::new(LevelFilter::Info, Config::default(), log_file),
@@ -45,36 +45,48 @@ async fn main() {
             // Execute the command
             let output = Command::new("bash")
                 .arg("-c")
-                .arg(format!(
-                "python <DIR>/finalize.py"
-                ))
+                .arg("python3 /home/grin/grin-finalize/finalize.py")
                 .output()
                 .expect("Failed to execute command");
 
             // Process the command output
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
+            let _exit_status = output.status;
 
-            if stderr.is_empty() {
+            // Log the outputs for debugging
+            info!("Command stdout: {}", stdout);
+            error!("Command stderr: {}", stderr);
+
+            // Check for specific success messages in stdout
+            if stdout.contains("The slatepack data is NOT encrypted") && stdout.contains("Command 'finalize' completed successfully") {
                 info!("Transaction finalized: {}", stdout);
                 return warp::reply::json(&Response {
                     message: "Grin transaction successfully finalized ツ".to_string(),
                 });
             } else {
-                error!("Failed to finalize transaction: {}", stderr);
+                let error_message = if !stderr.is_empty() {
+                    stderr.to_string()
+                } else if !stdout.is_empty() {
+                    stdout.to_string()
+                } else {
+                    "Command executed but produced no output.".to_string()
+                };
+
+                error!("Failed to finalize transaction: {}", error_message);
                 return warp::reply::json(&Response {
-                    message: format!("Error: {}", stderr),
+                    message: format!("Error: {}", error_message),
                 });
             }
         });
 
     // Load SSL keys and certs
-    let cert_path = "<DIR>/cert.pem";
-    let key_path = "<DIR>/cert.key";
+    let cert_path = "/etc/ssl/cert.pem";
+    let key_path = "/etc/ssl/privkey.pem";
 
     // Enable CORS
     let cors = warp::cors()
-        .allow_origin("<URL>")
+        .allow_origin("https://faucet.grinminer.net")
         .allow_methods(vec!["POST"])
         .allow_headers(vec!["Content-Type"]);
 
@@ -83,7 +95,7 @@ async fn main() {
         .tls()
         .cert_path(cert_path)
         .key_path(key_path)
-        .run(([0, 0, 0, 0], 3032)) // Listen on all interfaces
+        .run(([0, 0, 0, 0], 3033)) // Listen on all interfaces
         .await;
 }
 

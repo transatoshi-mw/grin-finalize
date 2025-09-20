@@ -14,7 +14,7 @@ import time
 
 def run_grin_wallet():
     # Start the grin-wallet finalize command
-    command = "<DIR>/grin-wallet finalize"
+    command = "/usr/local/bin/grin-wallet finalize"
     child = pexpect.spawn(command)
 
     # Expect the password prompt and send the password
